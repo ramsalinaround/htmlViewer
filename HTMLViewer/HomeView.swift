@@ -3,6 +3,7 @@ import SwiftUI
 struct HomeView: View {
     let addFolder: () -> Void
     let openFile: () -> Void
+    let openAddress: () -> Void
 
     @Environment(Library.self) private var library
     @State private var showingTransfer = false
@@ -49,6 +50,9 @@ struct HomeView: View {
             Section {
                 Button(action: openFile) {
                     Label("Open Single File…", systemImage: "doc.richtext")
+                }
+                Button(action: openAddress) {
+                    Label("Open Web Address…", systemImage: "globe")
                 }
             }
         }

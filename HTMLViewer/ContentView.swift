@@ -7,6 +7,8 @@ struct ContentView: View {
     @State private var importKind = ImportKind.folder
     @State private var showingImporter = false
     @State private var errorMessage: String?
+    @State private var showingAddress = false
+    @State private var addressText = ""
 
     private enum ImportKind { case folder, file }
 
@@ -14,7 +16,11 @@ struct ContentView: View {
         NavigationStack(path: $path) {
             HomeView(
                 addFolder: { present(.folder) },
-                openFile: { present(.file) }
+                openFile: { present(.file) },
+                openAddress: {
+                    addressText = ""
+                    showingAddress = true
+                }
             )
             .navigationDestination(for: Route.self) { route in
                 switch route {
@@ -33,6 +39,18 @@ struct ContentView: View {
         }
         .onOpenURL { url in
             receive(url)
+        }
+        .alert("Open Web Address", isPresented: $showingAddress) {
+            TextField("Website or search", text: $addressText)
+                .keyboardType(.webSearch)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+            Button("Cancel", role: .cancel) {}
+            Button("Go") {
+                if let url = WebViewStore.url(fromAddress: addressText) {
+                    path.append(.viewer(ViewerRoute(files: [], index: 0, root: library.documentsURL, startURL: url)))
+                }
+            }
         }
         .alert("Couldn't Open", isPresented: Binding(
             get: { errorMessage != nil },

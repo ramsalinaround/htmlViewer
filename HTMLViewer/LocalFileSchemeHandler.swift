@@ -67,10 +67,7 @@ final class LocalFileSchemeHandler: NSObject, WKURLSchemeHandler {
     }
 
     private func respond(to task: WKURLSchemeTask, url: URL, status: Int, data: Data = Data(), contentType: String? = nil) {
-        var headers = [
-            "Content-Length": String(data.count),
-            "Access-Control-Allow-Origin": "*",
-        ]
+        var headers = ["Content-Length": String(data.count)]
         headers["Content-Type"] = contentType
         let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)!
         task.didReceive(response)

@@ -18,6 +18,8 @@ struct ViewerRoute: Hashable {
     let files: [URL]
     let index: Int
     let root: URL
+    /// A web address to open instead, when `files` is empty.
+    var startURL: URL? = nil
 }
 
 /// A file or folder, for `sheet(item:)` and similar.

@@ -17,10 +17,15 @@ A small native iPhone/iPad app (SwiftUI + WebKit) for opening and reading `.html
   - **Share out:** long-press any file to share it, or any folder to share it as a `.zip`. The share button on a folder screen shares the whole folder.
   - **Files app & Finder:** the app's folder appears under *On My iPhone → HTML Viewer* in Files, and under your device in Finder (or iTunes on Windows).
 - **Manage files** in the app's own folder: New Folder, Import Files…, Import Folder…, Rename, Move…, Delete (long-press or swipe).
-- **Full rendering** with WebKit, with Back / Forward for links, swipe gestures, and **Find in page**.
+- **Full-screen browser:** pages fill the whole display, with no navigation bar or status bar.
+  - A small floating control bar slides away as you scroll down and comes back when you scroll up or reach the top or bottom. When it's hidden, tap the little handle at the bottom to bring it back. *Hide Controls* tucks it away on demand.
+  - **Page Size** (− / % / +) zooms the page from 50% to 300%; smaller fits more on screen. It's remembered across pages and launches.
+  - **Edge to Edge** lets pages draw under the notch and home indicator. **Desktop Site** asks for the wider desktop layout.
+  - Pull down to reload. Back / Forward, swipe gestures and **Find on Page** work as usual.
+  - Web links open inside the browser (Open in Safari is in the ⋯ menu). **Go to Address…** opens any website or searches, and so does **Open Web Address…** on the home screen.
 - **View Source** with selectable monospaced text, search, and Copy.
 - **JavaScript on/off** switch (⋯ menu) for untrusted files.
-- Web links open in Safari; `mailto:`/`tel:` links open the right app.
+- `mailto:`/`tel:` links open the right app. Web pages can't open or read your local files.
 - Files are opened read-only. The app never changes them.
 - iCloud files that aren't downloaded yet are fetched when you open them.
 
@@ -46,7 +51,7 @@ like AltStore or Sideloadly, which signs it with your own Apple ID.
 
 1. Launch the app → **Add Folder…** → pick the folder that holds your HTML files.
 2. Tap the folder, then tap any file. Switch to **All HTML Files** to see everything in its subfolders, or pull down to search.
-3. Inside a page, use the bottom bar to go to the previous or next file in the list.
+3. Inside a page, use the floating bar's ↑ / ↓ buttons to go to the previous or next file in the list, or tap "3 / 12" to jump to any file. Tap ✕ to go back to the list.
 
 Swipe left on a saved folder to remove it. The app only forgets the folder; nothing is deleted.
 
@@ -80,12 +85,12 @@ HTMLViewer/
   TransferWebPage.swift        The browser page served by Wi-Fi Transfer
   TransferView.swift           Wi-Fi Transfer screen
   FileSystem.swift             Directory scanning, coordinated (iCloud-aware) reads
-  HTMLViewerScreen.swift       Viewer UI, toolbars, previous/next file
-  WebViewStore.swift           WKWebView owner, navigation and link policy
+  HTMLViewerScreen.swift       Full-screen browser UI and floating controls
+  WebViewStore.swift           WKWebView owner: navigation, auto-hide, zoom, viewer settings
   LocalFileSchemeHandler.swift Serves files in the granted folder to WebKit
   SourceView.swift             "View Source" sheet
 Config/Info.plist              Document types (HTML, zip), file sharing, local network
-HTMLViewerTests/               Unit tests: zip, file operations, Wi-Fi Transfer server
+HTMLViewerTests/               Unit tests: zip, file operations, Wi-Fi Transfer server, browser
 ```
 
 Run the tests with ⌘U in Xcode. CI also runs them on a simulator.
