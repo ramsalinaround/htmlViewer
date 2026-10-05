@@ -2,22 +2,23 @@ import Foundation
 import UniformTypeIdentifiers
 import WebKit
 
-/// Serves the opened document (and, when readable, files next to it) to the
-/// web view through a custom URL scheme.
+/// Serves files from disk to the web view through a custom URL scheme.
 ///
-/// Loading through the app process instead of `loadFileURL` means documents
-/// opened from any Files location (iCloud Drive, other apps, external
-/// providers) render reliably, while relative links to CSS, scripts and
-/// images still resolve whenever the app is allowed to read them.
+/// Loading through the app process instead of `loadFileURL` lets pages from
+/// any Files location (iCloud Drive, other apps, external providers) render
+/// reliably, and relative links to CSS, scripts, images and other pages
+/// resolve against the folder the user granted access to. Requests outside
+/// that folder are refused.
+@MainActor
 final class LocalFileSchemeHandler: NSObject, WKURLSchemeHandler {
     static let scheme = "htmlviewer-file"
 
-    private let documentURL: URL
-    private let documentData: Data
+    private let rootPath: String
+    private var activeTasks = Set<ObjectIdentifier>()
 
-    init(documentURL: URL, documentData: Data) {
-        self.documentURL = documentURL.standardizedFileURL
-        self.documentData = documentData
+    init(root: URL) {
+        let path = root.standardizedFileURL.path(percentEncoded: false)
+        rootPath = path.hasSuffix("/") ? path : path + "/"
     }
 
     /// The URL the web view should load for a file on disk.
@@ -29,45 +30,52 @@ final class LocalFileSchemeHandler: NSObject, WKURLSchemeHandler {
         return components.url!
     }
 
+    /// The file on disk behind a URL produced by `webURL(for:)`.
+    static func fileURL(for webURL: URL) -> URL? {
+        guard webURL.scheme == scheme else { return nil }
+        return URL(fileURLWithPath: webURL.path(percentEncoded: false)).standardizedFileURL
+    }
+
     func webView(_ webView: WKWebView, start urlSchemeTask: WKURLSchemeTask) {
-        guard let requestURL = urlSchemeTask.request.url else {
+        guard let requestURL = urlSchemeTask.request.url,
+              let fileURL = Self.fileURL(for: requestURL) else {
             urlSchemeTask.didFailWithError(URLError(.badURL))
             return
         }
-
-        let fileURL = URL(fileURLWithPath: requestURL.path(percentEncoded: false)).standardizedFileURL
-        let data: Data?
-        if fileURL.path == documentURL.path {
-            data = documentData
-        } else {
-            data = try? Data(contentsOf: fileURL)
-        }
-
-        guard let data else {
-            let response = HTTPURLResponse(url: requestURL, statusCode: 404, httpVersion: "HTTP/1.1", headerFields: nil)!
-            urlSchemeTask.didReceive(response)
-            urlSchemeTask.didReceive(Data())
-            urlSchemeTask.didFinish()
+        guard fileURL.path(percentEncoded: false).hasPrefix(rootPath) else {
+            respond(to: urlSchemeTask, url: requestURL, status: 403)
             return
         }
 
-        let response = HTTPURLResponse(
-            url: requestURL,
-            statusCode: 200,
-            httpVersion: "HTTP/1.1",
-            headerFields: [
-                "Content-Type": Self.contentType(for: fileURL, data: data),
-                "Content-Length": String(data.count),
-                "Access-Control-Allow-Origin": "*",
-            ]
-        )!
-        urlSchemeTask.didReceive(response)
-        urlSchemeTask.didReceive(data)
-        urlSchemeTask.didFinish()
+        let taskID = ObjectIdentifier(urlSchemeTask)
+        activeTasks.insert(taskID)
+        Task {
+            let result = await Task.detached { Result { try FileAccess.read(fileURL) } }.value
+            guard activeTasks.remove(taskID) != nil else { return }
+            switch result {
+            case .success(let data):
+                respond(to: urlSchemeTask, url: requestURL, status: 200, data: data,
+                        contentType: Self.contentType(for: fileURL, data: data))
+            case .failure:
+                respond(to: urlSchemeTask, url: requestURL, status: 404)
+            }
+        }
     }
 
     func webView(_ webView: WKWebView, stop urlSchemeTask: WKURLSchemeTask) {
-        // Requests are answered synchronously, so there is nothing to cancel.
+        activeTasks.remove(ObjectIdentifier(urlSchemeTask))
+    }
+
+    private func respond(to task: WKURLSchemeTask, url: URL, status: Int, data: Data = Data(), contentType: String? = nil) {
+        var headers = [
+            "Content-Length": String(data.count),
+            "Access-Control-Allow-Origin": "*",
+        ]
+        headers["Content-Type"] = contentType
+        let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: headers)!
+        task.didReceive(response)
+        task.didReceive(data)
+        task.didFinish()
     }
 
     private static func contentType(for fileURL: URL, data: Data) -> String {

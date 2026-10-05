@@ -2,11 +2,18 @@ import Observation
 import UIKit
 import WebKit
 
-/// Owns the `WKWebView` for one open document and mirrors its state for SwiftUI.
+/// Owns the `WKWebView` for one viewer and mirrors its state for SwiftUI.
 @MainActor
 @Observable
 final class WebViewStore: NSObject {
     let webView: WKWebView
+
+    /// The files Previous / Next step through.
+    let files: [URL]
+    /// Index in `files` of the page on screen, or of the last one opened
+    /// from the list when a link led elsewhere.
+    private(set) var position: Int
+    private(set) var currentFileURL: URL?
 
     private(set) var canGoBack = false
     private(set) var canGoForward = false
@@ -17,15 +24,21 @@ final class WebViewStore: NSObject {
         didSet { webView.reload() }
     }
 
-    @ObservationIgnored private let startURL: URL
+    var title: String {
+        (currentFileURL ?? files[position]).lastPathComponent
+    }
+
+    var canGoToPreviousFile: Bool { position > 0 }
+    var canGoToNextFile: Bool { position < files.count - 1 }
+
     @ObservationIgnored private var observations: [NSKeyValueObservation] = []
 
-    init(data: Data, fileURL: URL?) {
-        let documentURL = fileURL ?? URL(fileURLWithPath: "/Untitled.html")
-        let handler = LocalFileSchemeHandler(documentURL: documentURL, documentData: data)
+    init(files: [URL], index: Int, root: URL) {
+        self.files = files.map(\.standardizedFileURL)
+        position = min(max(index, 0), files.count - 1)
 
         let configuration = WKWebViewConfiguration()
-        configuration.setURLSchemeHandler(handler, forURLScheme: LocalFileSchemeHandler.scheme)
+        configuration.setURLSchemeHandler(LocalFileSchemeHandler(root: root), forURLScheme: LocalFileSchemeHandler.scheme)
         configuration.allowsInlineMediaPlayback = true
         configuration.mediaTypesRequiringUserActionForPlayback = []
 
@@ -34,27 +47,45 @@ final class WebViewStore: NSObject {
         webView.allowsLinkPreview = true
         webView.isFindInteractionEnabled = true
         webView.isInspectable = true
-        startURL = LocalFileSchemeHandler.webURL(for: documentURL)
 
         super.init()
 
         webView.navigationDelegate = self
         webView.uiDelegate = self
         observeWebView()
-        webView.load(URLRequest(url: startURL))
+        openFile(at: position)
     }
 
     func goBack() { webView.goBack() }
     func goForward() { webView.goForward() }
     func reload() { webView.reload() }
-    func goHome() { webView.load(URLRequest(url: startURL)) }
+
+    func openFile(at index: Int) {
+        guard files.indices.contains(index) else { return }
+        position = index
+        webView.load(URLRequest(url: LocalFileSchemeHandler.webURL(for: files[index])))
+    }
+
+    func previousFile() { openFile(at: position - 1) }
+    func nextFile() { openFile(at: position + 1) }
 
     func showFind() {
         webView.findInteraction?.presentFindNavigator(showingReplace: false)
     }
 
+    private func urlDidChange(_ url: URL?) {
+        currentFileURL = url.flatMap(LocalFileSchemeHandler.fileURL(for:))
+        if let path = currentFileURL?.path,
+           let index = files.firstIndex(where: { $0.path == path }) {
+            position = index
+        }
+    }
+
     private func observeWebView() {
         observations = [
+            webView.observe(\.url, options: [.initial, .new]) { [weak self] webView, _ in
+                MainActor.assumeIsolated { self?.urlDidChange(webView.url) }
+            },
             webView.observe(\.canGoBack, options: [.initial, .new]) { [weak self] webView, _ in
                 MainActor.assumeIsolated { self?.canGoBack = webView.canGoBack }
             },

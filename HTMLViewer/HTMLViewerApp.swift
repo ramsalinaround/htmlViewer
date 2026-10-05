@@ -2,9 +2,12 @@ import SwiftUI
 
 @main
 struct HTMLViewerApp: App {
+    @State private var library = Library()
+
     var body: some Scene {
-        DocumentGroup(viewing: HTMLDocument.self) { file in
-            HTMLViewerScreen(data: file.document.data, fileURL: file.fileURL)
+        WindowGroup {
+            ContentView()
+                .environment(library)
         }
     }
 }

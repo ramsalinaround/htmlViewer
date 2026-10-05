@@ -4,15 +4,19 @@ A small native iPhone/iPad app (SwiftUI + WebKit) for opening and reading `.html
 
 ## Features
 
-- **Opens HTML from anywhere**: the built-in file browser (iCloud Drive, On My iPhone, Dropbox and other Files providers), or **Share → HTML Viewer** from Mail, Safari downloads, Messages, etc.
-- **Full rendering** with WebKit, including CSS, JavaScript, inline media, and relative CSS/JS/image files sitting next to the HTML (when iOS lets the app read them; see note below).
-- **Back / Forward / Reload** for links between local pages, and swipe gestures.
-- **Find in page** (magnifying glass in the bottom bar).
+- **Folders**: add any folder from iCloud Drive, On My iPhone, Dropbox, a USB drive or another Files location. The app remembers it across launches, so you can browse every HTML file inside it.
+  - **Browse** mode lets you go through the folder and its subfolders one level at a time.
+  - **All HTML Files** mode lists every HTML file in the folder and all its subfolders in one list.
+  - **Search** finds files by name or path across all subfolders.
+  - In the viewer, **Previous / Next File** buttons step through the list, and the "3 of 12" button lets you jump to any file.
+- **Relative links work inside folders.** Linked CSS, JavaScript, images, fonts and other pages in the folder all load, and links between pages navigate.
+- **Single files** can also be opened with *Open Single File…* or **Share → HTML Viewer** from Mail, Messages, Safari downloads and other apps.
+- **Full rendering** with WebKit, with Back / Forward for links, swipe gestures, and **Find in page**.
 - **View Source** with selectable monospaced text, search, and Copy.
 - **JavaScript on/off** switch (⋯ menu) for untrusted files.
 - Web links open in Safari; `mailto:`/`tel:` links open the right app.
 - Files are opened read-only. The app never changes them.
-- Web Inspector support, so you can debug pages from Safari on a Mac.
+- iCloud files that aren't downloaded yet are fetched when you open them.
 
 ## Building & installing
 
@@ -34,25 +38,31 @@ like AltStore or Sideloadly, which signs it with your own Apple ID.
 
 ## Using it
 
-- Launch the app → browse to an HTML file → tap it.
-- Or in any app: **Share** an `.html` file → **HTML Viewer**.
-- Files you copy into *Files → On My iPhone → HTML Viewer* also show up in the app.
+1. Launch the app → **Add Folder…** → pick the folder that holds your HTML files.
+2. Tap the folder, then tap any file. Switch to **All HTML Files** to see everything in its subfolders, or pull down to search.
+3. Inside a page, use the bottom bar to go to the previous or next file in the list.
 
-**Note on relative resources:** iOS only gives the app access to the file you
-opened. Linked CSS, JS, and images next to it load when the app can read them,
-for example when the whole folder is inside the app's own *On My iPhone → HTML Viewer*
-folder. Single-file HTML (inline styles/scripts, or resources loaded from
-`https://`) always works.
+Swipe left on a saved folder to remove it. The app only forgets the folder; nothing is deleted.
+Files you copy into *Files → On My iPhone → HTML Viewer* appear under **On This Device**.
+
+**Single files vs. folders:** iOS only lets the app read what you pick. A single
+file opened on its own can't load CSS, JS or images that sit next to it,
+unless they're inline or come from `https://`. Add the containing folder instead
+to get everything.
 
 ## Project layout
 
 ```
 HTMLViewer/
-  HTMLViewerApp.swift          App entry; DocumentGroup in viewer mode
-  HTMLDocument.swift           Read-only FileDocument for public.html
-  HTMLViewerScreen.swift       Viewer UI and toolbars
+  HTMLViewerApp.swift          App entry
+  ContentView.swift            Navigation, folder/file pickers, "Open in" handling
+  Library.swift                Saved folders (security-scoped bookmarks)
+  HomeView.swift               Folder list
+  FolderView.swift             Browse / All HTML Files / search
+  FileSystem.swift             Directory scanning, coordinated (iCloud-aware) reads
+  HTMLViewerScreen.swift       Viewer UI, toolbars, previous/next file
   WebViewStore.swift           WKWebView owner, navigation and link policy
-  LocalFileSchemeHandler.swift Serves the document and its sibling files to WebKit
+  LocalFileSchemeHandler.swift Serves files in the granted folder to WebKit
   SourceView.swift             "View Source" sheet
 Config/Info.plist              Document types, Files app / Open In support
 ```
