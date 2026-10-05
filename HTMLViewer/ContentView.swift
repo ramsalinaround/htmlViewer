@@ -2,13 +2,13 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ContentView: View {
-    private enum ImportKind { case folder, file }
-
     @Environment(Library.self) private var library
     @State private var path: [Route] = []
     @State private var importKind = ImportKind.folder
     @State private var showingImporter = false
     @State private var errorMessage: String?
+
+    private enum ImportKind { case folder, file }
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -32,7 +32,7 @@ struct ContentView: View {
             handleImport(result)
         }
         .onOpenURL { url in
-            openFile(url)
+            receive(url)
         }
         .alert("Couldn't Open", isPresented: Binding(
             get: { errorMessage != nil },
@@ -73,10 +73,58 @@ struct ContentView: View {
         }
     }
 
+    /// Opens a file picked with "Open Single File…" where it is, without copying it.
     private func openFile(_ url: URL) {
-        guard url.isFileURL else { return }
         library.beginAccessing(file: url)
         let route = ViewerRoute(files: [url], index: 0, root: url.deletingLastPathComponent())
         path.append(.viewer(route))
+    }
+
+    /// A file shared to the app from another app (Mail, Messages, AirDrop,
+    /// Files…): keep a copy in the app's folder, unpacking zips, then show it.
+    private func receive(_ url: URL) {
+        guard url.isFileURL else { return }
+        let documents = library.documentsURL
+        Task {
+            do {
+                let saved = try await Task.detached { try Self.save(url, in: documents) }.value
+                library.filesDidChange()
+                show(saved, in: documents)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
+        }
+    }
+
+    private nonisolated static func save(_ url: URL, in documents: URL) throws -> URL {
+        let inbox = documents.appending(path: "Inbox")
+        let isZip = url.pathExtension.lowercased() == "zip"
+        if AppFiles.isInside(url, documents) && !AppFiles.isInside(url, inbox) && !isZip {
+            return url  // Already in the app's folder.
+        }
+        // Copies iOS made for us in Documents/Inbox are moved, not duplicated.
+        let fromInbox = AppFiles.isInside(url, inbox)
+        let saved = try AppFiles.importItem(
+            at: url,
+            into: isZip && AppFiles.isInside(url, documents) && !fromInbox ? url.deletingLastPathComponent() : documents,
+            moveSource: fromInbox
+        )
+        if fromInbox { AppFiles.removeIfEmpty(inbox) }
+        return saved
+    }
+
+    private func show(_ item: URL, in documents: URL) {
+        if AppFiles.isDirectory(item) {
+            path = [.folder(FolderRoute(url: item, root: documents, title: item.lastPathComponent))]
+        } else if FolderScanner.isHTML(item) {
+            // Let Previous / Next step through the other pages next to it.
+            let siblings = (try? FolderScanner.listing(of: item.deletingLastPathComponent()).files) ?? []
+            let index = siblings.firstIndex { $0.lastPathComponent == item.lastPathComponent }
+            let route = index.map { ViewerRoute(files: siblings, index: $0, root: documents) }
+                ?? ViewerRoute(files: [item], index: 0, root: documents)
+            path = [.viewer(route)]
+        } else {
+            path = [.folder(FolderRoute(url: documents, root: documents, title: "HTML Viewer"))]
+        }
     }
 }

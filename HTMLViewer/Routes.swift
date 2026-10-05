@@ -19,3 +19,9 @@ struct ViewerRoute: Hashable {
     let index: Int
     let root: URL
 }
+
+/// A file or folder, for `sheet(item:)` and similar.
+struct FileItem: Identifiable, Hashable {
+    let url: URL
+    var id: URL { url }
+}

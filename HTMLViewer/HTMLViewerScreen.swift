@@ -24,14 +24,9 @@ struct HTMLViewerScreen: View {
     }
 }
 
-private struct SourceFile: Identifiable {
-    let url: URL
-    var id: URL { url }
-}
-
 private struct ViewerContent: View {
     @Bindable var store: WebViewStore
-    @State private var sourceFile: SourceFile?
+    @State private var sourceFile: FileItem?
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -96,7 +91,7 @@ private struct ViewerContent: View {
     private var moreMenu: some View {
         Menu("More", systemImage: "ellipsis.circle") {
             Button("View Source", systemImage: "chevron.left.forwardslash.chevron.right") {
-                sourceFile = SourceFile(url: store.currentFileURL ?? store.files[store.position])
+                sourceFile = FileItem(url: store.currentFileURL ?? store.files[store.position])
             }
             Button("Reload", systemImage: "arrow.clockwise") { store.reload() }
             Toggle(isOn: $store.javaScriptEnabled) {

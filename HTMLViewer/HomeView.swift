@@ -5,6 +5,7 @@ struct HomeView: View {
     let openFile: () -> Void
 
     @Environment(Library.self) private var library
+    @State private var showingTransfer = false
 
     var body: some View {
         List {
@@ -26,7 +27,7 @@ struct HomeView: View {
                 }
             }
 
-            Section("On This Device") {
+            Section {
                 NavigationLink(value: Route.folder(FolderRoute(
                     url: library.documentsURL,
                     root: library.documentsURL,
@@ -34,6 +35,15 @@ struct HomeView: View {
                 ))) {
                     Label("HTML Viewer Folder", systemImage: "iphone")
                 }
+                Button {
+                    showingTransfer = true
+                } label: {
+                    Label("Wi-Fi Transfer", systemImage: "wifi")
+                }
+            } header: {
+                Text("On This Device")
+            } footer: {
+                Text("Files shared to HTML Viewer from other apps are saved here. You can also reach this folder from the Files app, Finder, or a computer browser via Wi-Fi Transfer.")
             }
 
             Section {
@@ -48,6 +58,10 @@ struct HomeView: View {
                 EditButton()
             }
         }
+        .sheet(isPresented: $showingTransfer) {
+            TransferView()
+                .environment(library)
+        }
     }
 
     @ViewBuilder
@@ -55,6 +69,11 @@ struct HomeView: View {
         if let url = folder.url {
             NavigationLink(value: Route.folder(FolderRoute(url: url, root: url, title: folder.name))) {
                 Label(folder.name, systemImage: "folder")
+            }
+            .contextMenu {
+                ShareLink(item: FolderArchive(url: url), preview: SharePreview("\(folder.name).zip")) {
+                    Label("Share as ZIP", systemImage: "square.and.arrow.up")
+                }
             }
         } else {
             Label {

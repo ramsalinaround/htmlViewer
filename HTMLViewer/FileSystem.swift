@@ -4,19 +4,27 @@ enum FileAccess {
     /// Reads a file through `NSFileCoordinator`, which makes iCloud Drive and
     /// other file providers download the file first if it isn't local yet.
     static func read(_ url: URL) throws -> Data {
+        var data = Data()
+        try coordinatedRead(url) { data = try Data(contentsOf: $0) }
+        return data
+    }
+
+    /// Runs `body` with coordinated read access to `url` (a file or a folder).
+    static func coordinatedRead(_ url: URL, _ body: (URL) throws -> Void) throws {
         var coordinationError: NSError?
-        var result: Result<Data, Error> = .failure(CocoaError(.fileReadUnknown))
+        var bodyError: Error?
         NSFileCoordinator().coordinate(readingItemAt: url, options: .withoutChanges, error: &coordinationError) { url in
-            result = Result { try Data(contentsOf: url) }
+            do { try body(url) } catch { bodyError = error }
         }
-        if let coordinationError { throw coordinationError }
-        return try result.get()
+        if let error = coordinationError ?? bodyError { throw error }
     }
 }
 
 struct FolderListing: Sendable {
     var folders: [URL] = []
     var files: [URL] = []
+    /// Everything that isn't HTML (stylesheets, images…).
+    var others: [URL] = []
 }
 
 enum FolderScanner {
@@ -26,32 +34,28 @@ enum FolderScanner {
         htmlExtensions.contains(url.pathExtension.lowercased())
     }
 
-    /// Subfolders and HTML files directly inside `directory`.
+    /// Subfolders and files directly inside `directory`.
     static func listing(of directory: URL) throws -> FolderListing {
         var listing = FolderListing()
-        var coordinationError: NSError?
-        var readError: Error?
-        NSFileCoordinator().coordinate(readingItemAt: directory, options: .withoutChanges, error: &coordinationError) { directory in
-            do {
-                let contents = try FileManager.default.contentsOfDirectory(
-                    at: directory,
-                    includingPropertiesForKeys: [.isDirectoryKey]
-                )
-                for item in contents {
-                    guard let (url, isDirectory) = visibleItem(item) else { continue }
-                    if isDirectory {
-                        listing.folders.append(url)
-                    } else if isHTML(url) {
-                        listing.files.append(url)
-                    }
+        try FileAccess.coordinatedRead(directory) { directory in
+            let contents = try FileManager.default.contentsOfDirectory(
+                at: directory,
+                includingPropertiesForKeys: [.isDirectoryKey]
+            )
+            for item in contents {
+                guard let (url, isDirectory) = visibleItem(item) else { continue }
+                if isDirectory {
+                    listing.folders.append(url)
+                } else if isHTML(url) {
+                    listing.files.append(url)
+                } else {
+                    listing.others.append(url)
                 }
-            } catch {
-                readError = error
             }
         }
-        if let error = coordinationError ?? readError { throw error }
         listing.folders.sort(by: byName)
         listing.files.sort(by: byName)
+        listing.others.sort(by: byName)
         return listing
     }
 

@@ -21,6 +21,9 @@ final class Library {
 
     private(set) var folders: [Folder] = []
 
+    /// Bumped whenever the app changes files, so open folder lists reload.
+    private(set) var filesVersion = 0
+
     @ObservationIgnored private var stored: [StoredFolder] = []
     @ObservationIgnored private var accessedURLs: [UUID: URL] = [:]
     @ObservationIgnored private var accessedFiles: Set<URL> = []
@@ -80,6 +83,10 @@ final class Library {
         stored.move(fromOffsets: source, toOffset: destination)
         folders.move(fromOffsets: source, toOffset: destination)
         save()
+    }
+
+    func filesDidChange() {
+        filesVersion += 1
     }
 
     /// Keeps access to a single file opened from the file picker or another app.

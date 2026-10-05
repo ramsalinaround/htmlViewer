@@ -14,13 +14,15 @@ jobs:
       - name: Show Xcode version
         run: xcodebuild -version
 
-      - name: Build for Simulator
+      - name: Run tests on a simulator
         run: |
-          xcodebuild build \
+          DEVICE_ID=$(xcrun simctl list devices available -j \
+            | python3 -c 'import json,sys; d=json.load(sys.stdin)["devices"]; print(next(x["udid"] for k,v in sorted(d.items(), reverse=True) if "iOS" in k for x in v if x["name"].startswith("iPhone")))')
+          echo "Using simulator $DEVICE_ID"
+          xcodebuild test \
             -project HTMLViewer.xcodeproj \
             -scheme HTMLViewer \
-            -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination "id=$DEVICE_ID" \
             -derivedDataPath build/sim \
             CODE_SIGNING_ALLOWED=NO
 
