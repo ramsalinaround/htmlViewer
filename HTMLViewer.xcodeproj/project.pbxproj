@@ -66,8 +66,7 @@
 		A10000000000000000000031 /* Config */ = {
 			isa = PBXGroup;
 			children = (
-				A10000000000000000000003 /* HTMLViewerTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = HTMLViewerTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		A10000000000000000000002 /* Info.plist */,
+				A10000000000000000000002 /* Info.plist */,
 			);
 			path = Config;
 			sourceTree = "<group>";
