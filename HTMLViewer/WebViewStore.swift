@@ -34,7 +34,7 @@ final class WebViewStore: NSObject {
 
     var pageZoom = ViewerSettings.pageZoom {
         didSet {
-            webView.pageZoom = ViewerSettings.pageZoom
+            webView.pageZoom = pageZoom
             ViewerSettings.pageZoom = pageZoom
         }
     }
